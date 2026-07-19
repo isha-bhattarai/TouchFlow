@@ -121,6 +121,23 @@ export function isTouchFlowMessage(value: unknown): value is TouchFlowMessage {
   );
 }
 
+/** A device as shown in the agent window. */
+export interface AgentDeviceInfo {
+  id: string;
+  name: string;
+  platform: "android" | "ios" | "unknown";
+  battery: number | null;
+  charging: boolean;
+  connectedAt: number;
+}
+
+/** Everything the agent window needs to render, pushed over the /ui namespace. */
+export interface AgentUiState {
+  code: string;
+  codeExpiresAt: number;
+  devices: AgentDeviceInfo[];
+}
+
 /** Clamp a user-chosen sensitivity into the allowed range. */
 export function clampSensitivity(value: number): number {
   if (Number.isNaN(value)) return SENSITIVITY_MIN;
