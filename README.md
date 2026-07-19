@@ -8,6 +8,7 @@
 
 - 🧩 **Shared typed protocol** — one source of truth for every message between phone and PC *(M0 ✅)*
 - 🖥️ **Desktop agent** — Electron window with rotating 6-digit pairing code, JWT device auth, live device list *(M1 ✅)*
+- 📱 **Mobile app** — Expo connect flow, secure token storage, silent reconnect, battery reporting *(M2 ✅)*
 - 🖱️ Realtime touchpad — move, click, drag, two-finger scroll *(coming: M3)*
 - ⌨️ Full keyboard with special keys *(Phase 2)*
 - 🎵 Media, presentation & macro remotes *(Phases 3–5)*
@@ -33,6 +34,13 @@ npm run dev:server   # headless — prints LAN address + pairing code
 npm run build && npm start
 ```
 
+**Run the mobile app** (needs [Expo Go](https://expo.dev/go) on your phone):
+
+```bash
+cd apps/mobile
+npm start        # scan the QR with Expo Go — phone and PC must share Wi-Fi
+```
+
 ## Architecture
 
 ```
@@ -40,10 +48,13 @@ touchflow/
 ├── packages/
 │   └── shared/        # @touchflow/shared — protocol types, constants, guards
 ├── apps/
-│   └── agent/         # Electron desktop agent — pairing server + status window
-│       ├── src/server/  # Express + Socket.io, PairingService, JWT auth
-│       ├── src/ui/      # React renderer (glass dark UI)
-│       └── electron/    # main process
+│   ├── agent/         # Electron desktop agent — pairing server + status window
+│   ├── mobile/        # Expo app — connect flow, secure session, battery reports
+│   │   ├── src/lib/     # framework-free ConnectionManager, validation, storage
+│   │   └── src/screens/ # ConnectScreen, ConnectedScreen
+│   │   ├── src/server/  # Express + Socket.io, PairingService, JWT auth
+│   │   ├── src/ui/      # React renderer (glass dark UI)
+│   │   └── electron/    # main process
 └── .github/workflows/ # CI: typecheck + tests on every push
 ```
 
@@ -53,7 +64,7 @@ Phone and desktop agent both import `@touchflow/shared`, so protocol drift is im
 
 - [x] **M0** Project foundation — monorepo, shared protocol, CI
 - [x] **M1** Desktop agent — pairing server, JWT auth, agent window
-- [ ] **M2** Mobile app — connect flow, token storage, status screen
+- [x] **M2** Mobile app — connect flow, token storage, status screen
 - [ ] **M3** Realtime touchpad
 - [ ] **M4+** Phases 2–7
 

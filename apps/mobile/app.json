@@ -1,0 +1,13 @@
+{
+  "expo": {
+    "name": "TouchFlow",
+    "slug": "touchflow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0a0a0f",
+    "splash": { "backgroundColor": "#0a0a0f" },
+    "ios": { "supportsTablet": false },
+    "android": { "package": "com.touchflow.app" }
+  }
+}
