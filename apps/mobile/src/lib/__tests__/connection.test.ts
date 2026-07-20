@@ -148,6 +148,33 @@ describe("ConnectionManager token reconnect", () => {
     expect(errors).toEqual(["invalid-token"]);
   });
 
+  it("measures heartbeat round-trips on the phone's clock", () => {
+    vi.useFakeTimers();
+    try {
+      const latencies: number[] = [];
+      const socket = new FakeSocket();
+      const manager = new ConnectionManager(
+        () => socket,
+        {
+          onStatus: () => {},
+          onLatency: (rtt) => latencies.push(rtt),
+        },
+      );
+      manager.connectWithToken("192.168.1.42", "jwt", "android");
+      socket.serverSends("connect");
+
+      vi.advanceTimersByTime(5_000); // heartbeat interval elapses
+      const beat = socket.emitted.at(-1)?.payload as { t: string; sentAt: number };
+      expect(beat.t).toBe(MessageType.Heartbeat);
+
+      vi.advanceTimersByTime(37); // network round-trip
+      socket.serverSends(MESSAGE_EVENT, beat); // agent echoes sentAt untouched
+      expect(latencies).toEqual([37]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reports battery status over the message channel", () => {
     const { socket, manager } = setup();
     manager.connectWithToken("192.168.1.42", "jwt", "android");

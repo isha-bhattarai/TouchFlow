@@ -19,11 +19,13 @@ import {
   type HeartbeatMessage,
 } from "@touchflow/shared";
 import { signDeviceToken, verifyDeviceToken } from "./auth";
+import { NoopInputController, type InputController } from "./input";
 import { PairingService } from "./pairing";
 
 export interface AgentServerOptions {
   secret: string;
   pairing?: PairingService;
+  input?: InputController;
 }
 
 export interface AgentServer {
@@ -40,6 +42,7 @@ const LOCALHOST = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 export function createAgentServer(opts: AgentServerOptions): AgentServer {
   const { secret } = opts;
   const pairing = opts.pairing ?? new PairingService();
+  const input = opts.input ?? new NoopInputController();
 
   const app = express();
   app.get("/health", (_req, res) => {
@@ -155,13 +158,40 @@ export function createAgentServer(opts: AgentServerOptions): AgentServer {
           }
           return;
         }
+        case MessageType.PointerMove: {
+          if (!authed) return;
+          void input.moveBy(raw.dx, raw.dy);
+          return;
+        }
+        case MessageType.PointerClick: {
+          if (!authed) return;
+          void input.click(raw.button, raw.double);
+          return;
+        }
+        case MessageType.PointerDragStart: {
+          if (!authed) return;
+          void input.pressLeft();
+          return;
+        }
+        case MessageType.PointerDragEnd: {
+          if (!authed) return;
+          void input.releaseLeft();
+          return;
+        }
+        case MessageType.Scroll: {
+          if (!authed) return;
+          void input.scroll(raw.dx, raw.dy);
+          return;
+        }
         case MessageType.Heartbeat: {
           if (!authed) return;
+          // Echo the sender's timestamp untouched: RTT must be measured
+          // against a single clock (the phone's), never across two machines.
           socket.emit(
             MESSAGE_EVENT,
             createMessage<HeartbeatMessage>({
               t: MessageType.Heartbeat,
-              sentAt: Date.now(),
+              sentAt: raw.sentAt,
             }),
           );
           return;

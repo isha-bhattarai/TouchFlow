@@ -1,11 +1,14 @@
 import {
   DEFAULT_AGENT_PORT,
+  HEARTBEAT_INTERVAL_MS,
   MESSAGE_EVENT,
   MessageType,
   createMessage,
   isTouchFlowMessage,
   type DeviceStatusMessage,
+  type HeartbeatMessage,
   type PairRequestMessage,
+  type TouchFlowMessage,
 } from "@touchflow/shared";
 
 export type ConnectionStatus =
@@ -36,11 +39,14 @@ export interface ConnectionCallbacks {
   /** Fired once when pairing succeeds; persist this token securely. */
   onPaired?(token: string): void;
   onError?(message: string): void;
+  /** Round-trip time of each heartbeat, measured on the phone's clock. */
+  onLatency?(rttMs: number): void;
 }
 
 export class ConnectionManager {
   private socket: SocketLike | null = null;
   private timeout: ReturnType<typeof setTimeout> | null = null;
+  private heartbeat: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly createSocket: SocketFactory,
@@ -93,12 +99,27 @@ export class ConnectionManager {
     this.socket!.on("connect", () => {
       this.disarmTimeout();
       this.callbacks.onStatus("connected");
+      this.startHeartbeats();
+    });
+    this.socket!.on(MESSAGE_EVENT, (raw: unknown) => {
+      if (!isTouchFlowMessage(raw)) return;
+      if (raw.t === MessageType.Heartbeat) {
+        this.callbacks.onLatency?.(Date.now() - raw.sentAt);
+      }
     });
     this.socket!.on("connect_error", (err: unknown) => {
       const message = err instanceof Error ? err.message : "unreachable";
       this.fail(message === "invalid-token" ? "invalid-token" : "unreachable");
     });
-    this.socket!.on("disconnect", () => this.callbacks.onStatus("idle"));
+    this.socket!.on("disconnect", () => {
+      this.stopHeartbeats();
+      this.callbacks.onStatus("idle");
+    });
+  }
+
+  /** Send any protocol message (used by the touchpad for pointer events). */
+  send(message: TouchFlowMessage): void {
+    this.socket?.emit(MESSAGE_EVENT, message);
   }
 
   /** Report phone battery so the agent window's device card stays live. */
@@ -115,6 +136,7 @@ export class ConnectionManager {
 
   disconnect(): void {
     this.disarmTimeout();
+    this.stopHeartbeats();
     this.socket?.disconnect();
     this.socket = null;
     this.callbacks.onStatus("idle");
@@ -138,8 +160,27 @@ export class ConnectionManager {
     this.timeout = null;
   }
 
+  private startHeartbeats(): void {
+    this.stopHeartbeats();
+    this.heartbeat = setInterval(() => {
+      this.socket?.emit(
+        MESSAGE_EVENT,
+        createMessage<HeartbeatMessage>({
+          t: MessageType.Heartbeat,
+          sentAt: Date.now(),
+        }),
+      );
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopHeartbeats(): void {
+    if (this.heartbeat !== null) clearInterval(this.heartbeat);
+    this.heartbeat = null;
+  }
+
   private fail(reason: string): void {
     this.disarmTimeout();
+    this.stopHeartbeats();
     this.socket?.disconnect();
     this.socket = null;
     this.callbacks.onError?.(reason);
